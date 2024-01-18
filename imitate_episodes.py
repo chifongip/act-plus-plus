@@ -15,14 +15,14 @@ from torchvision import transforms
 from constants import FPS
 from constants import PUPPET_GRIPPER_JOINT_OPEN
 from utils import load_data # data functions
-from utils import sample_box_pose, sample_insertion_pose # robot functions
+from utils import sample_box_pose, sample_insertion_pose, sample_bowl_pose # robot functions
 from utils import compute_dict_mean, set_seed, detach_dict, calibrate_linear_vel, postprocess_base_action # helper functions
 from policy import ACTPolicy, CNNMLPPolicy, DiffusionPolicy
 from visualize_episodes import save_videos
 
 from detr.models.latent_model import Latent_Model_Transformer
 
-from sim_env import BOX_POSE
+from sim_env import BOX_POSE, BOWL1_POSE
 
 import IPython
 e = IPython.embed
@@ -150,7 +150,7 @@ def main(args):
     with open(config_path, 'wb') as f:
         pickle.dump(config, f)
     if is_eval:
-        ckpt_names = [f'policy_last.ckpt']
+        ckpt_names = [f'policy_best.ckpt']
         results = []
         for ckpt_name in ckpt_names:
             success_rate, avg_return = eval_bc(config, ckpt_name, save_episode=True, num_rollouts=10)
@@ -237,7 +237,7 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
     max_timesteps = config['episode_len']
     task_name = config['task_name']
     temporal_agg = config['temporal_agg']
-    onscreen_cam = 'angle'
+    onscreen_cam = 'top'
     vq = config['policy_config']['vq']
     actuator_config = config['actuator_config']
     use_actuator_net = actuator_config['actuator_network_dir'] is not None
@@ -325,6 +325,9 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
             BOX_POSE[0] = sample_box_pose() # used in sim reset
         elif 'sim_insertion' in task_name:
             BOX_POSE[0] = np.concatenate(sample_insertion_pose()) # used in sim reset
+        elif 'sim_cube_pnp' in task_name:
+            BOX_POSE[0] = sample_box_pose()
+            BOWL1_POSE[0] = sample_bowl_pose()
 
         ts = env.reset()
 
@@ -593,7 +596,7 @@ def train_bc(train_dataloader, val_dataloader, config):
             ckpt_name = f'policy_step_{step}_seed_{seed}.ckpt'
             ckpt_path = os.path.join(ckpt_dir, ckpt_name)
             torch.save(policy.serialize(), ckpt_path)
-            success, _ = eval_bc(config, ckpt_name, save_episode=True, num_rollouts=10)
+            success, _ = eval_bc(config, ckpt_name, save_episode=True, num_rollouts=1) # num_rollouts=10
             wandb.log({'success': success}, step=step)
 
         # training

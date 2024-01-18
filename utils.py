@@ -301,6 +301,20 @@ def postprocess_base_action(base_action):
 
 ### env utils
 
+def sample_bowl_pose():
+    x_range = [-0.15, 0.15]
+    y_range = [0.75, 0.85]
+    z_range = [0.04, 0.04]
+    # x_range = [-0.2,-0.2]
+    # y_range = [0.5,0.5]
+    # z_range = [0.04, 0.04]
+
+    ranges = np.vstack([x_range, y_range, z_range])
+    bowl_position = np.random.uniform(ranges[:, 0], ranges[:, 1])
+
+    bowl_quat = np.array([1, 0, 0, 0])
+    return np.concatenate([bowl_position, bowl_quat])
+
 def sample_box_pose():
     x_range = [0.0, 0.2]
     y_range = [0.4, 0.6]

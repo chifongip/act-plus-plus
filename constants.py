@@ -4,6 +4,13 @@ import os
 ### Task parameters
 DATA_DIR = '/home/lscm/aloha_ws/src/act-plus-plus/demo' # if os.getlogin() == 'zfu' else '/scr/tonyzhao/datasets'
 SIM_TASK_CONFIGS = {
+    'sim_cube_pnp':{
+        'dataset_dir': DATA_DIR + '/sim_cube_pnp_scripted_one_bowl',
+        'num_episodes': 50,
+        'episode_len': 400,
+        'camera_names': ['top', 'front_close', 'right_wrist']
+    },
+
     'sim_transfer_cube_scripted':{
         'dataset_dir': DATA_DIR + '/sim_transfer_cube_scripted',
         'num_episodes': 50,

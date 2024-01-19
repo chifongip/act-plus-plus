@@ -15,14 +15,14 @@ from torchvision import transforms
 from constants import FPS
 from constants import PUPPET_GRIPPER_JOINT_OPEN
 from utils import load_data # data functions
-from utils import sample_box_pose, sample_insertion_pose, sample_bowl_pose # robot functions
+from utils import sample_box_pose, sample_insertion_pose, sample_bowl_pose, sample_towel_pose # robot functions
 from utils import compute_dict_mean, set_seed, detach_dict, calibrate_linear_vel, postprocess_base_action # helper functions
 from policy import ACTPolicy, CNNMLPPolicy, DiffusionPolicy
 from visualize_episodes import save_videos
 
 from detr.models.latent_model import Latent_Model_Transformer
 
-from sim_env import BOX_POSE, BOWL1_POSE
+from sim_env import BOX_POSE, BOWL1_POSE, TOWEL_POSE
 
 import IPython
 e = IPython.embed
@@ -150,7 +150,7 @@ def main(args):
     with open(config_path, 'wb') as f:
         pickle.dump(config, f)
     if is_eval:
-        ckpt_names = [f'policy_best.ckpt']
+        ckpt_names = [f'policy_last.ckpt']
         results = []
         for ckpt_name in ckpt_names:
             success_rate, avg_return = eval_bc(config, ckpt_name, save_episode=True, num_rollouts=10)
@@ -237,7 +237,7 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
     max_timesteps = config['episode_len']
     task_name = config['task_name']
     temporal_agg = config['temporal_agg']
-    onscreen_cam = 'top'
+    onscreen_cam = 'cam_high'
     vq = config['policy_config']['vq']
     actuator_config = config['actuator_config']
     use_actuator_net = actuator_config['actuator_network_dir'] is not None
@@ -328,6 +328,8 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
         elif 'sim_cube_pnp' in task_name:
             BOX_POSE[0] = sample_box_pose()
             BOWL1_POSE[0] = sample_bowl_pose()
+        elif 'sim_towel' in task_name or 'sim_towel_cotrain' in task_name:
+            TOWEL_POSE[0] = sample_towel_pose()
 
         ts = env.reset()
 
@@ -474,7 +476,7 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
                 # time.sleep(max(0, DT - duration - culmulated_delay))
                 if duration >= DT:
                     culmulated_delay += (duration - DT)
-                    print(f'Warning: step duration: {duration:.3f} s at step {t} longer than DT: {DT} s, culmulated delay: {culmulated_delay:.3f} s')
+                    # print(f'Warning: step duration: {duration:.3f} s at step {t} longer than DT: {DT} s, culmulated delay: {culmulated_delay:.3f} s')
                 # else:
                 #     culmulated_delay = max(0, culmulated_delay - (DT - duration))
 
@@ -503,12 +505,18 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
         episode_returns.append(episode_return)
         episode_highest_reward = np.max(rewards)
         highest_rewards.append(episode_highest_reward)
-        print(f'Rollout {rollout_id}\n{episode_return=}, {episode_highest_reward=}, {env_max_reward=}, Success: {episode_highest_reward==env_max_reward}')
+        if 'sim_towel' in task_name or 'sim_towel_cotrain' in task_name:
+            print(f'Rollout {rollout_id}\n{episode_return=}, {episode_highest_reward=}, {env_max_reward=}, Success: {episode_return > 250}')
+        else:
+            print(f'Rollout {rollout_id}\n{episode_return=}, {episode_highest_reward=}, {env_max_reward=}, Success: {episode_highest_reward==env_max_reward}')
 
         # if save_episode:
         #     save_videos(image_list, DT, video_path=os.path.join(ckpt_dir, f'video{rollout_id}.mp4'))
 
-    success_rate = np.mean(np.array(highest_rewards) == env_max_reward)
+    if 'sim_towel' in task_name or 'sim_towel_cotrain' in task_name:
+        success_rate = np.mean(np.array(episode_returns) > 250)
+    else:
+        success_rate = np.mean(np.array(highest_rewards) == env_max_reward)
     avg_return = np.mean(episode_returns)
     summary_str = f'\nSuccess rate: {success_rate}\nAverage return: {avg_return}\n\n'
     for r in range(env_max_reward+1):
@@ -596,7 +604,7 @@ def train_bc(train_dataloader, val_dataloader, config):
             ckpt_name = f'policy_step_{step}_seed_{seed}.ckpt'
             ckpt_path = os.path.join(ckpt_dir, ckpt_name)
             torch.save(policy.serialize(), ckpt_path)
-            success, _ = eval_bc(config, ckpt_name, save_episode=True, num_rollouts=1) # num_rollouts=10
+            success, _ = eval_bc(config, ckpt_name, save_episode=True, num_rollouts=10) 
             wandb.log({'success': success}, step=step)
 
         # training

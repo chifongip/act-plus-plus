@@ -227,6 +227,13 @@ def load_data(dataset_dir_l, name_filter, camera_names, batch_size_train, batch_
     num_episodes_l = [len(dataset_path_list) for dataset_path_list in dataset_path_list_list]
     num_episodes_cumsum = np.cumsum(num_episodes_l)
 
+    # print("dataset_dir_l:", dataset_dir_l)
+    # print("dataset_path_list_list:", dataset_path_list_list)
+    # print("num_episodes_0:", num_episodes_0)
+    # print("dataset_path_list:", dataset_path_list)
+    # print("num_episodes_l:", num_episodes_l)
+    # print("num_episodes_cumsum:", num_episodes_cumsum)
+
     # obtain train test split on dataset_dir_l[0]
     shuffled_episode_ids_0 = np.random.permutation(num_episodes_0)
     train_episode_ids_0 = shuffled_episode_ids_0[:int(train_ratio * num_episodes_0)]
@@ -235,6 +242,15 @@ def load_data(dataset_dir_l, name_filter, camera_names, batch_size_train, batch_
     val_episode_ids_l = [val_episode_ids_0]
     train_episode_ids = np.concatenate(train_episode_ids_l)
     val_episode_ids = np.concatenate(val_episode_ids_l)
+
+    # print("shuffled_episode_ids_0:", shuffled_episode_ids_0)
+    # print("train_episode_ids_0:", train_episode_ids_0)
+    # print("val_episode_ids_0:", val_episode_ids_0)
+    # print("train_episode_ids_l:", train_episode_ids_l)
+    # print("val_episode_ids_l:", val_episode_ids_l)
+    # print("train_episode_ids:", train_episode_ids)
+    # print("val_episode_ids:", val_episode_ids)
+
     print(f'\n\nData from: {dataset_dir_l}\n- Train on {[len(x) for x in train_episode_ids_l]} episodes\n- Test on {[len(x) for x in val_episode_ids_l]} episodes\n\n')
 
     # obtain normalization stats for qpos and action
@@ -252,10 +268,39 @@ def load_data(dataset_dir_l, name_filter, camera_names, batch_size_train, batch_
     elif type(stats_dir_l) == str:
         stats_dir_l = [stats_dir_l]
     norm_stats, _ = get_norm_stats(flatten_list([find_all_hdf5(stats_dir, skip_mirrored_data) for stats_dir in stats_dir_l]))
+
+    # print("all_episode_len:", all_episode_len)
+    # print("train_episode_len_l:", train_episode_len_l)
+    # print("val_episode_len_l:", val_episode_len_l)
+    # print("train_episode_len:", train_episode_len)
+    # print("val_episode_len:", val_episode_len)
+    # print("stats_dir_l:", stats_dir_l)
+    # print("norm_stats:", norm_stats)
+
     print(f'Norm stats from: {stats_dir_l}')
+
+    # sample_probs = np.array(sample_weights) / np.sum(sample_weights) if sample_weights is not None else None
+    # sum_dataset_len_l = np.cumsum([0] + [np.sum(episode_len) for episode_len in train_episode_len_l])
+    # while True:
+    #     batch = []
+    #     for _ in range(batch_size_train):
+    #         episode_idx = np.random.choice(len(train_episode_len_l), p=sample_probs)
+    #         step_idx = np.random.randint(sum_dataset_len_l[episode_idx], sum_dataset_len_l[episode_idx + 1])
+    #         batch.append(step_idx)
+    #     # yield batch
+    #     break
+
+    # print("sample_probs:", sample_probs)
+    # print("sum_dataset_len_l:", sum_dataset_len_l)
+    # print("episode_idx:", episode_idx)
+    # print("step_idx:", step_idx)
+    # print("batch:", batch)
 
     batch_sampler_train = BatchSampler(batch_size_train, train_episode_len_l, sample_weights)
     batch_sampler_val = BatchSampler(batch_size_val, val_episode_len_l, None)
+
+    # print("batch_sampler_train:", batch_sampler_train)
+    # print("batch_sampler_val:", batch_sampler_val)
 
     # print(f'train_episode_len: {train_episode_len}, val_episode_len: {val_episode_len}, train_episode_ids: {train_episode_ids}, val_episode_ids: {val_episode_ids}')
 
@@ -267,6 +312,13 @@ def load_data(dataset_dir_l, name_filter, camera_names, batch_size_train, batch_
     print(f'Augment images: {train_dataset.augment_images}, train_num_workers: {train_num_workers}, val_num_workers: {val_num_workers}')
     train_dataloader = DataLoader(train_dataset, batch_sampler=batch_sampler_train, pin_memory=True, num_workers=train_num_workers, prefetch_factor=2)
     val_dataloader = DataLoader(val_dataset, batch_sampler=batch_sampler_val, pin_memory=True, num_workers=val_num_workers, prefetch_factor=2)
+
+    # print("train_dataset:", train_dataset)
+    # print("val_dataset:", val_dataset)
+    # print("train_num_workers:", train_num_workers)
+    # print("val_num_workers:", val_num_workers)
+    # print("train_dataloader:", train_dataloader)
+    # print("val_dataloader:", val_dataloader)
 
     return train_dataloader, val_dataloader, norm_stats, train_dataset.is_sim
 
@@ -301,12 +353,27 @@ def postprocess_base_action(base_action):
 
 ### env utils
 
+def sample_towel_pose():
+    x_range = [-0.1, 0.1]
+    y_range = [0.45, 0.75]
+    z_range = [0.01, 0.01]
+    # x_range = [0, 0]
+    # y_range = [0.6, 0.6]
+    # z_range = [0.01, 0.01]
+
+    ranges = np.vstack([x_range, y_range, z_range])
+    towel_position = np.random.uniform(ranges[:, 0], ranges[:, 1])
+
+    towel_quat = np.array([1, 0, 0, 0])
+    # towel_quat = np.array([0.707, 0, 0, 0.707])
+    return np.concatenate([towel_position, towel_quat])
+
 def sample_bowl_pose():
     x_range = [-0.15, 0.15]
     y_range = [0.75, 0.85]
     z_range = [0.04, 0.04]
-    # x_range = [-0.2,-0.2]
-    # y_range = [0.5,0.5]
+    # x_range = [-0.1,-0.1]
+    # y_range = [0.8,0.8]
     # z_range = [0.04, 0.04]
 
     ranges = np.vstack([x_range, y_range, z_range])
